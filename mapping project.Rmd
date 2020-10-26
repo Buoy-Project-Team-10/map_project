@@ -1,0 +1,154 @@
+---
+title: "Map Assignment"
+author: "Chenghao Meng"
+date: "2020/10/25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load("tidyverse","hurricaneexposuredata","drat","maps","leaflet")
+```
+
+## 1 Data Cleaning
+
+To begin with, we will load the dataset from the package `hurricaneexposuredata`.
+
+```{r}
+# Extract data for the mapping
+addRepo("geanders")
+data("hurr_tracks")
+data("rain")
+```
+
+Then we extract the track data of **Floyd-1999** and **Allison-2001**.
+
+```{r}
+TrackFloyd <- hurr_tracks %>% filter(storm_id=="Floyd-1999")
+TrackAllison <- hurr_tracks %>% filter(storm_id=="Allison-2001")
+```
+
+After that, we will use the `filter` , `group_by` and `summarise`functions to extract rainfall data of **Floyd-1999** and **Allison-2001**.
+
+```{r message=FALSE, warning=FALSE}
+RainFloydRaw <- rain %>% 
+  filter(storm_id=="Floyd-1999") %>% 
+  group_by(fips,storm_id) %>% 
+  summarise(sum_precip=sum(precip))
+
+RainAllisonRaw <- rain %>% 
+  filter(storm_id=="Allison-2001") %>% 
+  group_by(fips,storm_id) %>% 
+  summarise(sum_precip=sum(precip))
+```
+
+Since the column of fips is not that standard, we will make some transformation on that to make the all the fips numbers in a 5-digit format by using `str_pad` function in `stringr` package.
+
+```{r}
+# Make adjustments on fips
+CountyFips <- county.fips
+CountyFips$fips <- as.character(CountyFips$fips)
+# if fips looks like "1001" rather than "01001", transformation is needed
+CountyFips$fips <- str_pad(CountyFips$fips,5,side = "left",pad = "0")
+```
+
+After that, we will use `merge` function to join the CountyFips data frame into the data frames of rainfall data.
+
+```{r}
+RainFloydPre <- merge(RainFloydRaw,CountyFips,by="fips") %>% separate(polyname, into= c("region","subregion"),sep= ",")
+
+RainAllisonPre <- merge(RainAllisonRaw,CountyFips,by="fips") %>% separate(polyname, into= c("region","subregion"),sep= ",")
+```
+
+To get the target map, we will use the `map` package to extract necessary dataset.
+
+```{r}
+MainStates <- map_data("county",c("texas","oklahoma","kansas","louisiana","arkansas","missouri","iowa","wisconsin","michigan","illinois","indiana","ohio","kentucky","tennessee","alabama","mississippi","florida","georgia","south carolina","north carolina","virginia","west virginia","maryland","delaware","pennsylvania","new jersey","new york","connecticut","rhode island","massachusetts","vermont","new hampshire","maine"))
+```
+
+Then, we will create RainFloyd and RainAllison data frames for further analysis.
+
+```{r}
+# Create RainFloyd
+RainFloyd <- merge(MainStates,RainFloydPre,by=c("region","subregion"))
+RainFloyd[RainFloyd==0.0] <- 0
+
+# Make cut
+RainFloyd$rain_cut <- cut(RainFloyd$sum_precip,breaks=c(0,25,50,75,100,125,150,175,200,225),ordered_result = T,include.lowest = T)
+```
+
+```{r}
+# Create RainAllison
+RainAllison <- merge(MainStates,RainAllisonPre,by=c("region","subregion"))
+RainAllison[RainAllison==0.0] <- 0
+
+# Make the cut
+RainAllison$rain_cut <- ifelse(RainAllison$sum_precip>175,"Exposed","Unexposed")
+
+```
+
+Before moving on, we should test if the created colums contain NAs for the convenience of mapping.
+
+```{r}
+# NA test
+anyNA(RainFloyd$rain_cut)
+anyNA(RainAllison$rain_cut)
+```
+
+## 2 Map: Using ggplot
+
+### 2.1 Floyd-1999
+
+```{r warning=FALSE}
+RainFloydPlot <- ggplot() + 
+  geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),colour="black",fill="white") + 
+  
+  geom_polygon(data=RainFloyd,aes(x=long,y=lat,group=group,fill=rain_cut),colour="transparent")+
+  
+  geom_path(data=TrackFloyd,aes(longitude, latitude),color="red")+
+  
+  xlim(min(MainStates$long),max(MainStates$long)) + 
+  ylim(min(MainStates$lat),max(MainStates$lat))
+```
+
+```{r message=FALSE, warning=FALSE}
+RainFloydPlot + 
+  # Change the title of the legend
+  labs(fill="Rainfall(mm)") + 
+  xlab("Longitude") + ylab("Latitude") +
+  ggtitle("Floyd-1999") + 
+  scale_fill_brewer(palette="Blues") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### 2.2 Allison-2001
+
+```{r}
+RainAllisonPlot <- ggplot() + 
+  geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),colour="black",fill="white") + 
+  
+  geom_polygon(data=RainAllison,aes(x=long,y=lat,group=group,fill=rain_cut),colour="transparent")+
+  
+  geom_path(data=TrackAllison,aes(longitude, latitude),color="red")+
+  
+  xlim(min(MainStates$long),max(MainStates$long)) + 
+  ylim(min(MainStates$lat),max(MainStates$lat))
+```
+
+```{r message=FALSE, warning=FALSE}
+RainAllisonPlot + 
+  # Change the title of the legend
+  labs(fill="Rainfall > 175mm") +  
+  xlab("Longitude") + ylab("Latitude") +
+  ggtitle("Allison-2001") + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## 3 Map: Using leaflet
+
+```{r}
+
+leaflet(data = MainStates) %>% addTiles() %>%
+  addPolygons(fillColor = topo.colors(10, alpha = NULL), stroke = FALSE)
+```
+
