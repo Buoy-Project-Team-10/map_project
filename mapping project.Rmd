@@ -1,9 +1,11 @@
 ---
 title: "Map Assignment"
-subtitle: "Group 10"
 author: "Chenghao Meng, Fan Feng, Yinfeng Zhou"
 date: "2020/10/25"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
+subtitle: Group 10
 ---
 
 ```{r setup, include=FALSE}
@@ -113,7 +115,7 @@ RainFloydPlot <- ggplot() +
   geom_path(data=TrackFloyd,aes(longitude, latitude),color="red")+
   
   xlim(min(MainStates$long),max(MainStates$long)) + 
-  ylim(min(MainStates$lat),max(MainStates$lat))
+  ylim(min(MainStates$lat),max(MainStates$lat)) 
 ```
 
 ```{r message=FALSE, warning=FALSE}
@@ -123,6 +125,7 @@ RainFloydPlot +
   xlab("Longitude") + ylab("Latitude") +
   ggtitle("Floyd-1999") + 
   scale_fill_brewer(palette="Blues") +
+  theme_void() +
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
@@ -139,7 +142,7 @@ RainAllisonPlot <- ggplot() +
   geom_path(data=TrackAllison,aes(longitude, latitude),color="red")+
   
   xlim(min(MainStates$long),max(MainStates$long)) + 
-  ylim(min(MainStates$lat),max(MainStates$lat))
+  ylim(min(MainStates$lat),max(MainStates$lat)) 
 ```
 
 ```{r message=FALSE, warning=FALSE}
@@ -148,6 +151,7 @@ RainAllisonPlot +
   labs(fill="Rainfall > 175mm") +  
   xlab("Longitude") + ylab("Latitude") +
   ggtitle("Allison-2001") + 
+  theme_void() +
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
@@ -199,9 +203,10 @@ tm_shape(tRainFloyd)+
 
 ```{r message=FALSE, warning=FALSE}
 # Add title
-tRainFloydPlot + 
+tRainFloydPlot +
   tm_layout(main.title='Floyd-1999',
-            main.title.position="center")
+            main.title.position="center",
+            frame = FALSE)
 ```
 
 ## 3.2 tmap: Allison-2001
@@ -235,13 +240,14 @@ tm_shape(tRainAllison)+
               title="Rainfall > 175mm",
               palette=plasma(n=2,direction=-1))+
   tm_shape(tTrackAllison) +
-  tm_lines(col='red')
+  tm_lines(col='red') 
 ```
 
 ```{r message=FALSE, warning=FALSE}
 # Add title
 tRainAllisonPlot + 
   tm_layout(main.title='Allison-2001',
-            main.title.position="center")
+            main.title.position="center",
+            frame = FALSE)
 ```
 
