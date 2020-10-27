@@ -1,5 +1,6 @@
 ---
 title: "Map Assignment"
+subtitle: "Group 10"
 author: "Chenghao Meng"
 date: "2020/10/25"
 output: html_document
@@ -42,7 +43,7 @@ RainAllisonRaw <- rain %>%
   summarise(sum_precip=sum(precip))
 ```
 
-Since the column of fips is not that standard, we will make some transformation on that to make the all the fips numbers in a 5-digit format by using `str_pad` function in `stringr` package.
+Since the column of fips is not that standard, we will make some transformations on that to make all the fips numbers in a 5-digit format by using `str_pad` function in `stringr` package.
 
 ```{r}
 # Make adjustments on fips
@@ -52,7 +53,7 @@ CountyFips$fips <- as.character(CountyFips$fips)
 CountyFips$fips <- str_pad(CountyFips$fips,5,side = "left",pad = "0")
 ```
 
-After that, we will use `merge` function to join the CountyFips data frame into the data frames of rainfall data.
+After that, we will use `merge` function to join the **CountyFips** data frame into the data frames of rainfall data.
 
 ```{r}
 RainFloydPre <- merge(RainFloydRaw,CountyFips,by="fips") %>% separate(polyname, into= c("region","subregion"),sep= ",")
