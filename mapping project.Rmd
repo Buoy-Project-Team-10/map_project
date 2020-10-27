@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-pacman::p_load("tidyverse","hurricaneexposuredata","drat","maps","leaflet")
+pacman::p_load("tidyverse","hurricaneexposuredata","drat","maps","tmap","sp","sf")
 ```
 
 ## 1 Data Cleaning
@@ -28,7 +28,7 @@ TrackFloyd <- hurr_tracks %>% filter(storm_id=="Floyd-1999")
 TrackAllison <- hurr_tracks %>% filter(storm_id=="Allison-2001")
 ```
 
-After that, we will use the `filter` , `group_by` and `summarise`functions to extract rainfall data of **Floyd-1999** and **Allison-2001**.
+After that, we will use the `filter` , `group_by` and `summarise` functions to extract rainfall data of **Floyd-1999** and **Allison-2001**.
 
 ```{r message=FALSE, warning=FALSE}
 RainFloydRaw <- rain %>% 
@@ -63,7 +63,11 @@ RainAllisonPre <- merge(RainAllisonRaw,CountyFips,by="fips") %>% separate(polyna
 To get the target map, we will use the `map` package to extract necessary dataset.
 
 ```{r}
-MainStates <- map_data("county",c("texas","oklahoma","kansas","louisiana","arkansas","missouri","iowa","wisconsin","michigan","illinois","indiana","ohio","kentucky","tennessee","alabama","mississippi","florida","georgia","south carolina","north carolina","virginia","west virginia","maryland","delaware","pennsylvania","new jersey","new york","connecticut","rhode island","massachusetts","vermont","new hampshire","maine"))
+StatesInt <- c("texas","oklahoma","kansas","louisiana","arkansas","missouri","iowa","wisconsin","michigan","illinois","indiana","ohio","kentucky","tennessee","alabama","mississippi","florida","georgia","south carolina","north carolina","virginia","west virginia","maryland","delaware","pennsylvania","new jersey","new york","connecticut","rhode island","massachusetts","vermont","new hampshire","maine")
+```
+
+```{r}
+MainStates <- map_data("county",StatesInt)
 ```
 
 Then, we will create RainFloyd and RainAllison data frames for further analysis.
@@ -97,13 +101,13 @@ anyNA(RainAllison$rain_cut)
 
 ## 2 Map: Using ggplot
 
-### 2.1 Floyd-1999
+### 2.1 ggplot: Floyd-1999
 
 ```{r warning=FALSE}
 RainFloydPlot <- ggplot() + 
-  geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),colour="black",fill="white") + 
+  geom_polygon(data=RainFloyd,aes(x=long,y=lat,group=group,fill=rain_cut))+
   
-  geom_polygon(data=RainFloyd,aes(x=long,y=lat,group=group,fill=rain_cut),colour="transparent")+
+  geom_path(data=MainStates,mapping=aes(long,lat,group=group),color="grey")+
   
   geom_path(data=TrackFloyd,aes(longitude, latitude),color="red")+
   
@@ -121,13 +125,15 @@ RainFloydPlot +
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-### 2.2 Allison-2001
+### 2.2 ggplot: Allison-2001
 
 ```{r}
 RainAllisonPlot <- ggplot() + 
-  geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),colour="black",fill="white") + 
+  #geom_polygon(data=MainStates, aes(x=long, y=lat, group=group),colour="black",fill="white") + 
   
   geom_polygon(data=RainAllison,aes(x=long,y=lat,group=group,fill=rain_cut),colour="transparent")+
+  
+  geom_path(data=MainStates,mapping=aes(long,lat,group=group),color="grey")+
   
   geom_path(data=TrackAllison,aes(longitude, latitude),color="red")+
   
@@ -144,11 +150,97 @@ RainAllisonPlot +
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-## 3 Map: Using leaflet
+## 3 Map: Using tmap
+
+## 3.1 tmap: Floyd-1999
+
+To use `tmap` package, we must transform the data into spatial version by using `sf :: st_as_sf` function.
 
 ```{r}
+# Spatial transformation
+tMap <- st_as_sf(map("county",StatesInt,plot=F,fill=T))
+```
 
-leaflet(data = MainStates) %>% addTiles() %>%
-  addPolygons(fillColor = topo.colors(10, alpha = NULL), stroke = FALSE)
+In order to visualize the rainfall with `tmap`, we need to join the **RainFloyd** data frame to **tMap**, so that we can have a data frame in spatial format.
+
+```{r}
+# RainFloyd in spatial foramt
+tRainFloydPre <- RainFloyd %>% 
+  select(region,subregion,rain_cut) %>% 
+  mutate(ID=str_c(region,subregion,sep = ",")) %>% 
+  select(ID,rain_cut) %>% 
+  rename(`Rainfall(mm)`=rain_cut)
+
+tRainFloyd <- left_join(tMap,tRainFloydPre,by="ID")
+```
+
+Similarly, **TrackFloyd** is also needed to be transformed into spatial lines.
+
+```{r}
+# TrackFloyd in spatial format
+tTrackFloyd=cbind(TrackFloyd$longitude,TrackFloyd$latitude)%>%
+  Line() %>% Lines(ID='Floyd-1999') %>%
+  list() %>% SpatialLines()
+```
+
+Now, we can have the rainfall status map of Floyd-1999 by using `tmap` package.
+
+```{r message=FALSE, warning=FALSE}
+tRainFloydPlot <- 
+tm_shape(tRainFloyd)+
+  tm_polygons(border.col="white",lwd=0.1,colorNA=NULL,
+              col='Rainfall(mm)',style="cont",
+              title="Rainfall(mm)",
+              palette=cividis(n=7,direction=-1))+
+  tm_shape(tTrackFloyd) +
+  tm_lines(col='red')
+```
+
+```{r message=FALSE, warning=FALSE}
+# Add title
+tRainFloydPlot + 
+  tm_layout(main.title='Floyd-1999',
+            main.title.position="center")
+```
+
+## 3.2 tmap: Allison-2001
+
+We will do the similar steps to get the rainfall data of Allison-2001 in spatial format.
+
+```{r}
+# RainAllison in spatial format
+tRainAllisonPre <- RainAllison %>% 
+  select(region,subregion,rain_cut) %>% 
+  mutate(ID=str_c(region,subregion,sep = ",")) %>% 
+  select(ID,rain_cut) %>% 
+  rename(`Rainfall > 175mm`=rain_cut)
+
+tRainAllison <- left_join(tMap,tRainAllisonPre,by="ID")
+```
+
+```{r}
+# TrackFloyd in spatial format
+tTrackAllison=cbind(TrackAllison$longitude,TrackAllison$latitude) %>%
+  Line() %>% Lines(ID='Floyd-1999') %>%
+  list() %>% SpatialLines()
+```
+
+Then, we can have the rainfall status map of Allison-2001.
+```{r}
+tRainAllisonPlot <- 
+tm_shape(tRainAllison)+
+  tm_polygons(border.col="white",lwd=0.1,colorNA=NULL,
+              col='Rainfall > 175mm',style="cont",
+              title="Rainfall > 175mm",
+              palette=plasma(n=2,direction=-1))+
+  tm_shape(tTrackAllison) +
+  tm_lines(col='red')
+```
+
+```{r message=FALSE, warning=FALSE}
+# Add title
+tRainAllisonPlot + 
+  tm_layout(main.title='Allison-2001',
+            main.title.position="center")
 ```
 
