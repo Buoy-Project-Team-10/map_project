@@ -1,7 +1,7 @@
 ---
 title: "Map Assignment"
 subtitle: "Group 10"
-author: "Chenghao Meng"
+author: "Chenghao Meng, Fan Feng, Yinfeng Zhou"
 date: "2020/10/25"
 output: html_document
 ---
